@@ -1,9 +1,10 @@
-#--- parameters for the XOR-2 experiment ---#
+#--- parameters for the NEAT FlapPy game ---#
 
 [NEAT]
 fitness_criterion     = max
 fitness_threshold     = 3.9
-pop_size              = 150
+no_fitness_termination = True
+pop_size              = 100
 reset_on_extinction   = False
 
 [DefaultGenome]
