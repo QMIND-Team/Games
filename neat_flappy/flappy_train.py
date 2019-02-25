@@ -1,5 +1,4 @@
 import neat
-import pickle
 import os
 import sys
 from FlapPyBird.flappy import FlappyBirdApp
@@ -45,9 +44,6 @@ def run (config_file):
     # Run until we achive n.
     winner = p.run(eval_genomes, 50)
 
-    # dump
-    pickle.dump(winner, open('winner.pkl', 'wb'))
-
 def main():
     if len(sys.argv)>1:
         run(int(sys.argv[1]))
@@ -55,9 +51,7 @@ def main():
         run()
 
 if __name__ == "__main__":
-    # Determine path to configuration file. This path manipulation is
-    # here so that the script will run successfully regardless of the
-    # current working directory.
+    # Fix working directory
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'config-flappy')
     run(config_path)
