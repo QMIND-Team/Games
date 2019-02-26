@@ -1,3 +1,6 @@
+#QMIND Gaming Team Version
+#Contributions by Andrew Simonds
+
 import neat
 import os
 import sys
