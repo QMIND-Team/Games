@@ -1,5 +1,7 @@
+#QMIND Gaming Team Version
+#Contributions by Andrew Simonds
+
 import neat
-import pickle
 import os
 import sys
 from FlapPyBird.flappy import FlappyBirdApp
@@ -22,7 +24,10 @@ def eval_genomes(genomes, config):
         energy = result['energy']
 
         fitness = score*3000 + 0.2*distance - energy*1.5
-        genomes.fitness = -1 if fitness == 0 else fitness
+        if fitness == 0:
+            genomes.fitness = -1 
+        else:
+            genomes.fitness = fitness
         if top_score < score:
             top_score = score
 
@@ -45,9 +50,6 @@ def run (config_file):
     # Run until we achive n.
     winner = p.run(eval_genomes, 50)
 
-    # dump
-    pickle.dump(winner, open('winner.pkl', 'wb'))
-
 def main():
     if len(sys.argv)>1:
         run(int(sys.argv[1]))
@@ -55,9 +57,7 @@ def main():
         run()
 
 if __name__ == "__main__":
-    # Determine path to configuration file. This path manipulation is
-    # here so that the script will run successfully regardless of the
-    # current working directory.
+    # Fix working directory
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'config-flappy')
     run(config_path)
