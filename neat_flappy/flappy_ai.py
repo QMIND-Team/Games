@@ -24,7 +24,10 @@ def eval_genomes(genomes, config):
         energy = result['energy']
 
         fitness = score*3000 + 0.2*distance - energy*1.5
-        genomes.fitness = -1 if fitness == 0 else fitness
+        if fitness == 0:
+            genomes.fitness = -1 
+        else:
+            genomes.fitness = fitness
         if top_score < score:
             top_score = score
 
