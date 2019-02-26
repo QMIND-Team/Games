@@ -404,7 +404,7 @@ class FastPlayer(object):
         return options[0]
 
 
-#SimplePlayer().playGame()
+SimplePlayer().playGame()
 HumanPlayer().playGame()
 pygame.time.wait(500)
 FastPlayer().playGame()
