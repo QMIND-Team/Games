@@ -12,8 +12,8 @@ class HumanPlayer(object):
             delayTime /= 1.001
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.display.quit()
-                    sys.exit()
+                    pygame.quit()
+                    #sys.exit()
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_LEFT:
                         game.moveLeft()
@@ -45,12 +45,13 @@ class HumanPlayer(object):
             pygame.time.wait(int(delayTime) - (time - oldTime))
 
         game.render()
-        game.screen.blit(Game.font.render("Score: " + str(game.numLinesCleared), True, (0, 0, 255)), (10, 100))
+        print("Score: " + str(game.numLinesCleared))
+        #game.screen.blit(Game.font.render("Score: " + str(game.numLinesCleared), True, (0, 0, 255)), (10, 100))
         pygame.display.update()
         keyPressed = False
         while not keyPressed:
             pygame.time.wait(100)
             for event in pygame.event.get():
                 keyPressed = event.type
-        pygame.display.quit()
-        sys.exit()
+        pygame.quit()
+        #sys.exit()
