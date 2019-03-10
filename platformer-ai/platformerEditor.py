@@ -8,12 +8,16 @@ pygame.init()
 dh = 650
 dw = 1300
 roomwidth = 2500
+roomheight = dh
+
+pathmax = 100 * roomwidth
 
 # color RGB codes
 black = (0,0,0)
 white = (255,255,255)
 red = (255,0,0)
 font = pygame.font.Font('freesansbold.ttf', 50)
+font2 = pygame.font.Font('freesansbold.ttf', 100)
 
 gameDisplay = pygame.display.set_mode((dw, dh))
 pygame.display.set_caption('platformer')
@@ -70,15 +74,15 @@ ailearny = 200
 
 savelevel = pygame.image.load('savelevel.png')
 savelevelsize = [260,80]
-savelevelpos = [500,0]
+savelevelpos = [700,0]
 
 resetlevel = pygame.image.load('reset.png')
 resetsize = [260,80]
-resetpos = [500,100]
+resetpos = [700,100]
 
 setdefault = pygame.image.load('setdefault.png')
 setdefaultsize = [260,80]
-setdefaultpos = [500,200]
+setdefaultpos = [700,200]
 
 normblock = pygame.image.load('Normal Block.png')
 normblocksize = 50
@@ -118,6 +122,18 @@ smallcoinsize = [22,22]
 coinscoreim = pygame.image.load('coinscore.png').convert_alpha()
 coinscoresize = [92,46]
 coinscorepos = [1100,0]
+
+wincondition = pygame.image.load('win condition.png')
+winconditionsize = [293,58]
+winconditionpos = [320,10]
+
+shortestdist = pygame.image.load('Shortest Distance.png')
+shortdistsize = [318,58]
+shortdistpos = [320,110]
+
+shortpath = pygame.image.load('Shortest Path.png').convert_alpha()
+shortpathsize = [293,58]
+shortpathpos = [320,210]
 
 smallenemy = pygame.image.load('smallenemy.png')
 smallenemysize = 15
@@ -162,6 +178,77 @@ resetblocks = [[0, 0, 0, 1, int((botright[1] - topleft[1]) / smallblocksize)],
            int((botright[1] - topleft[1]) / smallblocksize)]]
 resetenemies = []
 resetcoins = []
+
+def convertblockslisttogrid(blocklist):
+    grid = []
+    for i in range(0,int(roomwidth/normblocksize)):
+        grid.append([])
+        for _ in range(0,int(roomheight/normblocksize)):
+            grid[i].append(0)
+    for blocks in blocklist:
+        for i in range(0,blocks[4]):
+            grid[int(blocks[0]+i*blocks[2])][int(blocks[1]+i*blocks[3])] = 1
+    return grid
+
+def convertgridpos(thingpos,thingsize):
+    return [int((thingpos[0]+thingsize[0]/2)/normblocksize),int((thingpos[1]+thingsize[1]/2)/normblocksize)]
+
+def findshortestpath(playerpos,flagpos,grid):
+    playergridpos = []
+    playergridpos.append(convertgridpos(playerpos,[manwid,manhi]))
+    flaggridpos = convertgridpos(flagpos,flagsize)
+    length = 0
+    finalpos = [playergridpos[0][0],playergridpos[0][1]]
+    for locations in playergridpos:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+
+        if locations[0] == flaggridpos[0] and locations[1] == flaggridpos[1]:
+            return length
+
+        if grid[locations[0]+1][locations[1]] == 0:
+            flag = 0
+            for positions in playergridpos:
+                if locations[0]+1 == positions[0] and locations[1] == positions[1]:
+                    flag = 1
+                    break
+            if flag == 0:
+                playergridpos.append([locations[0]+1,locations[1]])
+
+        if grid[locations[0]-1][locations[1]] == 0:
+            flag = 0
+            for positions in playergridpos:
+                if locations[0] - 1 == positions[0] and locations[1] == positions[1]:
+                    flag = 1
+                    break
+            if flag == 0:
+                playergridpos.append([locations[0]-1,locations[1]])
+
+        if grid[locations[0]][locations[1]+1] == 0:
+            flag = 0
+            for positions in playergridpos:
+                if locations[0] == positions[0] and locations[1]+1 == positions[1]:
+                    flag = 1
+                    break
+            if flag == 0:
+                playergridpos.append([locations[0],locations[1]+1])
+
+        if grid[locations[0]][locations[1]-1] == 0 and locations[1]>0:
+            flag = 0
+            for positions in playergridpos:
+                if locations[0] == positions[0] and locations[1]-1 == positions[1]:
+                    flag = 1
+                    break
+            if flag == 0:
+                playergridpos.append([locations[0],locations[1]-1])
+
+        if locations[0] == finalpos[0] and locations[1] == finalpos[1]:
+            length = length +1
+            finalpos = [playergridpos[-1][0],playergridpos[-1][1]]
+
+    return (pathmax)
 
 def mouseon(mousepos,thingpos,thingsize):  #([mouse x,mouse y],[thing x,thing y],[thingwid,thinghi]).
     if (mousepos[0] > thingpos[0] and mousepos[0]< thingpos[0] + thingsize[0]) and (mousepos[1] > thingpos[1] and mousepos[1]< thingpos[1] + thingsize[1]):
@@ -293,6 +380,8 @@ def leveleditorloop():
     coindispy = 120
     flagdispx = 65
     flagdispy = 170
+    enemyoffset = 0.2
+    flagoffset = 0.4
     manpos = copy.deepcopy(savedmanpos)
     flagpos = copy.deepcopy(savedflagpos)
     blocks = copy.deepcopy(savedblocks)
@@ -311,6 +400,7 @@ def leveleditorloop():
     enemiestempdef = copy.deepcopy(defaultenemylist)
     coinstempdef = copy.deepcopy(defaultcoinslist)
 
+    wintype = 2
     objtype = 0
     rectbuffer = 12
     rectwid = 7
@@ -341,30 +431,37 @@ def leveleditorloop():
                 pygame.quit()
                 quit()
         if mouseon(mousepos,[topleft[0],topleft[1]],[botright[0]-topleft[0],botright[1]-topleft[1]]) and mousebuttons[0]==1:
+            flag = 0
+            if int((mousepos[0] - topleft[0]) / smallblocksize)<1 or int((mousepos[0] - topleft[0]) / smallblocksize)>= int(roomwidth/normblocksize)-1:
+                flag = 1
+            if int((mousepos[1] - topleft[1]) / smallblocksize)>=int(roomheight/normblocksize)-1:
+                flag = 1
+            for block in blocks:
+                if block == [int((mousepos[0] - topleft[0]) / smallblocksize),
+                             int((mousepos[1] - topleft[1]) / smallblocksize), 0, 1, 1]:
+                    flag = 1
+            for enemy in enemies:
+                if enemy == [int((mousepos[0] - topleft[0]) / smallblocksize),
+                             int((mousepos[1] - topleft[1]) / smallblocksize)]:
+                    flag = 1
+            for coin in coins:
+                if coin == [int((mousepos[0] - topleft[0]) / smallblocksize),
+                            int((mousepos[1] - topleft[1]) / smallblocksize)]:
+                    flag = 1
             if objtype == 1:
-                flag = 0
-                for block in blocks:
-                    if block == [int((mousepos[0]-topleft[0])/smallblocksize),int((mousepos[1]-topleft[1])/smallblocksize),0,1,1]:
-                        flag = 1
                 if flag == 0:
                     blocks.append([int((mousepos[0]-topleft[0])/smallblocksize),int((mousepos[1]-topleft[1])/smallblocksize),0,1,1])
             if objtype == 2:
-                flag = 0
-                for enemy in enemies:
-                    if enemy == [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)]:
-                        flag = 1
                 if flag == 0:
                     enemies.append(
                     [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)])
             if objtype == 3:
-                manpos = [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)]
+                if flag == 0:
+                    manpos = [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)]
             if objtype == 4:
-                flagpos = [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)]
+                if flag == 0:
+                    flagpos = [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)]
             if objtype == 5:
-                flag = 0
-                for coin in coins:
-                    if coin == [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)]:
-                        flag = 1
                 if flag == 0:
                     coins.append(
                     [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)])
@@ -403,6 +500,11 @@ def leveleditorloop():
         if mouseon(mousepos, [coindispx, coindispy], smallcoinsize) and mousebuttons[0] == 1:
             objtype = 5
 
+        if mouseon(mousepos, shortpathpos, shortpathsize) and mousebuttons[0] == 1:
+            wintype = 1
+        if mouseon(mousepos, shortdistpos, shortdistsize) and mousebuttons[0] == 1:
+            wintype = 2
+
         if mouseon(mousepos, resetpos, resetsize) and mousebuttons[0] == 1:
             manpos = copy.deepcopy(resetmanpos)
             flagpos = copy.deepcopy(resetflagpos)
@@ -425,11 +527,11 @@ def leveleditorloop():
             coinstempdef = copy.deepcopy(coins)
             manpostempdef[0] = manpostempdef[0] * normblocksize
             manpostempdef[1] = manpostempdef[1] * normblocksize
-            flagpostempdef[0] = flagpostempdef[0] * normblocksize
+            flagpostempdef[0] = flagpostempdef[0] * normblocksize + normblocksize*flagoffset
             flagpostempdef[1] = flagpostempdef[1] * normblocksize
             for enemy in enemiestempdef:
-                enemy[0] = enemy[0] * normblocksize
-                enemy[1] = enemy[1] * normblocksize
+                enemy[0] = enemy[0] * normblocksize + enemyoffset * normblocksize
+                enemy[1] = enemy[1] * normblocksize + enemyoffset * normblocksize
             for coin in coinstempdef:
                 coin[0] = coin[0] * normblocksize
                 coin[1] = coin[1] * normblocksize
@@ -437,11 +539,11 @@ def leveleditorloop():
         if mouseon(mousepos,[userplayx,userplayy],[userplaywid,userplayhi]) and mousebuttons[0] ==1:
             manpos[0] = manpos[0]*normblocksize
             manpos[1] = manpos[1] * normblocksize
-            flagpos[0] = flagpos[0] * normblocksize
+            flagpos[0] = flagpos[0] * normblocksize + normblocksize*flagoffset
             flagpos[1] = flagpos[1] * normblocksize
             for enemy in enemies:
-                enemy[0]= enemy[0]*normblocksize
-                enemy[1] = enemy[1] * normblocksize
+                enemy[0]= enemy[0]*normblocksize + enemyoffset*normblocksize
+                enemy[1] = enemy[1] * normblocksize + enemyoffset*normblocksize
             for coin in coins:
                 coin[0]= coin[0]*normblocksize
                 coin[1] = coin[1] * normblocksize
@@ -452,30 +554,30 @@ def leveleditorloop():
         if mouseon(mousepos, [ailearnx, ailearny], [ailearnwid, ailearnhi]) and mousebuttons[0] == 1:
             manpos[0] = manpos[0] * normblocksize
             manpos[1] = manpos[1] * normblocksize
-            flagpos[0] = flagpos[0] * normblocksize
+            flagpos[0] = flagpos[0] * normblocksize+ normblocksize*flagoffset
             flagpos[1] = flagpos[1] * normblocksize
             for enemy in enemies:
-                enemy[0] = enemy[0] * normblocksize
-                enemy[1] = enemy[1] * normblocksize
+                enemy[0] = enemy[0] * normblocksize + enemyoffset * normblocksize
+                enemy[1] = enemy[1] * normblocksize + enemyoffset * normblocksize
             for coin in coins:
                 coin[0]= coin[0]*normblocksize
                 coin[1] = coin[1] * normblocksize
-            if quickAIloop(blocks, enemies, manpos,1,flagpos,coins) ==-1:
+            if quickAIloop(blocks, enemies, manpos,1,flagpos,coins,wintype) ==-1:
                 return -1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
             else:
                 return 1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
         if mouseon(mousepos, [aifinishx, aifinishy], [aifinishwid, aifinishhi]) and mousebuttons[0] == 1:
             manpos[0] = manpos[0] * normblocksize
             manpos[1] = manpos[1] * normblocksize
-            flagpos[0] = flagpos[0] * normblocksize
+            flagpos[0] = flagpos[0] * normblocksize+ normblocksize*flagoffset
             flagpos[1] = flagpos[1] * normblocksize
             for enemy in enemies:
-                enemy[0] = enemy[0] * normblocksize
-                enemy[1] = enemy[1] * normblocksize
+                enemy[0] = enemy[0] * normblocksize + enemyoffset * normblocksize
+                enemy[1] = enemy[1] * normblocksize + enemyoffset * normblocksize
             for coin in coins:
                 coin[0]= coin[0]*normblocksize
                 coin[1] = coin[1] * normblocksize
-            if quickAIloop(blocks, enemies, manpos,0,flagpos,coins) ==-1:
+            if quickAIloop(blocks, enemies, manpos,0,flagpos,coins,wintype) ==-1:
                 return -1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
             else:
                 return 1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
@@ -491,6 +593,12 @@ def leveleditorloop():
         if objtype == 5:
             pygame.draw.rect(gameDisplay, red, [coindispx - rectbuffer,coindispy - rectbuffer,smallcoinsize[0]+2*rectbuffer,smallcoinsize[1]+2*rectbuffer],rectwid)
 
+        if wintype == 1:
+            pygame.draw.rect(gameDisplay, black, [shortpathpos[0] - rectbuffer,shortpathpos[1] - rectbuffer,shortpathsize[0]+2*rectbuffer,shortpathsize[1]+2*rectbuffer],rectwid)
+        if wintype == 2:
+            pygame.draw.rect(gameDisplay, black, [shortdistpos[0] - rectbuffer,shortdistpos[1] - rectbuffer,shortdistsize[0]+2*rectbuffer,shortdistsize[1]+2*rectbuffer],rectwid)
+
+
         drawgrid(topleft, botright, smallblocksize, 1)
         drawsmallman(manpos[0]*smallblocksize+topleft[0]+ smallmanwid/2,manpos[1]*smallblocksize+topleft[1])
         drawsmallenemies(enemies,topleft[0],topleft[1])
@@ -504,6 +612,9 @@ def leveleditorloop():
         gameDisplay.blit(resetlevel, resetpos)
         gameDisplay.blit(savelevel, savelevelpos)
         gameDisplay.blit(setdefault, setdefaultpos)
+        gameDisplay.blit(shortestdist, shortdistpos)
+        gameDisplay.blit(shortpath, shortpathpos)
+        gameDisplay.blit(wincondition, winconditionpos)
         drawman(guydispx,guydispy)
         drawenemy(enemydispx, enemydispy)
         drawblock(blockdispx, blockdispy)
@@ -512,7 +623,7 @@ def leveleditorloop():
 
         pygame.display.update()
 
-def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput,manpos,graphics,previousdatainput,generation,genswait,flagpos,coinlist):
+def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput,manpos,graphics,previousdatainput,generation,genswait,flagpos,coinlist,wintype):
     previousdata = copy.deepcopy(previousdatainput)
 
     enemylist = []
@@ -533,7 +644,7 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
     jumpspeed = 3.8
     gravacc = 0.03
 
-    if graphics == -1 or generation <= genswait or previousdata == 0:
+    if graphics == 1 or generation <= genswait or previousdata == 0:
         dead = []
         manxabs= []
         manyabs = []
@@ -689,13 +800,15 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
 
             for i in range(0,len(playerlists)):
                 if dead[i] == 0:
-                    if i == 199:
-                        drawmanred(manxrel[i], manyrel[i])
-                    else:
-                        drawman(manxrel[i], manyrel[i])
+                   drawman(manxrel[i], manyrel[i])
         else:
             gameDisplay.fill(white)
-            pygame.draw.rect(gameDisplay, red, [dw/2,dh/2,50,50])  # drawing enemy rectangles
+            text = font.render("AI LEARNING PLEASE WAIT", True, black)
+            gameDisplay.blit(text,(290,100))
+            text = font.render("CURRENTLY RUNNING" ,True, black)
+            gameDisplay.blit(text,(360,230))
+            text = font2.render("GENERATION  " + str(generation), True, (126,30,200))
+            gameDisplay.blit(text, (250, 400))
         #
         #game checks here
         #
@@ -786,10 +899,6 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
                         (enemylist[i][0] >= manxabs[j]and enemylist[i][0] <= manxabs[j]+manwid) or (
                         enemylist[i][0] + enemywid >= manxabs[j]and enemylist[i][0] + enemywid <= manxabs[j]+manwid) or (
                                 enemylist[i][0] + enemywid <= manxabs[j]+manwid and enemylist[i][0] >= manxabs[j]) or (manxabs[j]>= enemylist[i][0] and manxabs[j]+ manwid <= enemylist[i][0]+enemywid)):
-                    if j == 199:
-                        print("I KILLED ENEMY",i)
-                        if deadenemies[j][i] == 1:
-                            print("BUT IT WAS ALREADY DEAD")
                     goodcoll[j] = 1
                     collindex[j] = i
                 if (enemylist[i][1] + enemyhi >= manyabs[j]- collisionbuff and enemylist[i][
@@ -827,7 +936,7 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
                 botcoll[i] = 0
             else:
                 botcoll[i] = 1
-            if collindex != -1:
+            if collindex[i] != -1:
                 if deathcoll[i] == 1 and deadenemies[i][collindex[i]]== 0:
                     dead[i] = 1
                 if goodcoll[i] == 1 and deadenemies[i][collindex[i]]== 0:
@@ -835,7 +944,7 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
                     if playerlists[i][int(frame/repeat)] >= 2:
                         manyspeed[i] = -jumpspeed
                     deadenemies[i][collindex[i]] = 1
-                    print("ENEMY",collindex[i] ,"HAS DIED")
+
 
         #
         #end loop stuff
@@ -844,9 +953,18 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
         clock.tick(clockspeed)
         frame = frame+1
     outdata = []
+    blockgrid = convertblockslisttogrid(blocklist)
     for i in range(0,len(playerlists)):
         #outdata.append(math.sqrt(manxabs[i]**2+(roomheight-manyabs[i])**2))      # win condition function
-        outdata.append(distancebetween([manxabs[i],manyabs[i]],flagpos))
+        #outdata.append(distancebetween([manxabs[i],manyabs[i]],flagpos))
+        if dead[i] == 1:
+            outdata.append(pathmax)
+        else:
+            if wintype == 1:
+                outdata.append(findshortestpath([manxabs[i],manyabs[i]],flagpos,blockgrid))
+            if wintype == 2:
+                outdata.append(distancebetween([manxabs[i], manyabs[i]], flagpos))
+
     if generation%genswait == 0:
         restoredata = []
         restoredata.append(dead)
@@ -880,15 +998,15 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
     else:
         return (outdata,previousdatainput)
 
-def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist):
-    numplayers = 200
+def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist,wintype):
+    numplayers = 10
     genswait = 2
-    finalgen = 20
+    finalgen = 100
     playersteps = []
-    keepers = 10
-    mutation = 0.1
+    keepers = 2
+    mutation = 0.66
     repeat = 48
-    stepsadded = 7  # THIS FACTOR IS NUMBER OF CHOICES
+    stepsadded = 3  # THIS FACTOR IS NUMBER OF CHOICES
     totalsteps = stepsadded
     # generate random directions, 0 = LEFT, 1 = RIGHT, 2 = UP, 3 = Up LEFT, 4 = up RIGHT
     for i in range(0, numplayers):
@@ -912,7 +1030,7 @@ def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist):
                 quit()
         savedata = []
 
-        testdata,restoredata = quickAIgame(playersteps, totalsteps * repeat,repeat,totalsteps,blocklist,enemylist,manpos,graphics,restoredata,generation,genswait,flagpos,coinlist)
+        testdata,restoredata = quickAIgame(playersteps, totalsteps * repeat,repeat,totalsteps,blocklist,enemylist,manpos,graphics,restoredata,generation,genswait,flagpos,coinlist,wintype)
         print("finished generation", generation)
 
         if testdata == -1:
@@ -924,6 +1042,9 @@ def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist):
             winnersteps = playersteps[restoredata]
             print("THIS REALLY SHOULD REACH FLAG")
             break
+        if min(testdata) == pathmax:
+            print("Could Not Solve")
+            return 1
 
         if generation == finalgen:
             # winnersteps = playersteps[testdata.index(max(testdata))]
@@ -971,7 +1092,10 @@ def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist):
                             if item == i:
                                 flag = 1
                         if flag == 0:
-                            restoredata[i].append(saverestore[i][j])
+                            if i == 6:
+                                restoredata[i].append(copy.deepcopy(saverestore[i][j]))
+                            else:
+                                restoredata[i].append(saverestore[i][j])
                 for i in range(0, totalsteps):
                     if i < totalsteps - stepsadded:
                         playersteps[k * len(savedata) + j].append(savedata[j][i])
@@ -981,7 +1105,7 @@ def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist):
                         playersteps[k * len(savedata) + j].append(savedata[j][i])
 
         pygame.display.update()
-    quickAIgame([winnersteps], totalsteps * repeat, repeat, totalsteps, blocklist, enemylist, manpos,1,0,finalgen,genswait,flagpos,coinlist)
+    quickAIgame([winnersteps], totalsteps * repeat, repeat, totalsteps, blocklist, enemylist, manpos,1,0,finalgen,genswait,flagpos,coinlist,wintype)
     return 1
 
 def quickgameloop(blocklist,enemylistinput,manpos,flagpos,coinlistinput):
@@ -1278,7 +1402,7 @@ while 1==1:
     if directive == 2:
         quickgameloop(defaultblocklist,defaultenemylist,defaultmanpos,defaultflagpos,defaultcoinslist)
     if directive == 3:
-        quickAIloop(defaultblocklist,defaultenemylist,defaultmanpos,1,defaultflagpos,defaultcoinslist)
+        quickAIloop(defaultblocklist,defaultenemylist,defaultmanpos,1,defaultflagpos,defaultcoinslist,2)
 
 pygame.quit()
 quit()
