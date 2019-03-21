@@ -6,7 +6,7 @@ import math
 import flappy_ai
 from FlapPyBird_User import flappy_user
 from FlapPyBird_User import *
-
+6
 pygame.init()
 
 dh = 400

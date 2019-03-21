@@ -323,6 +323,7 @@ def gen_step(trees,trees2,bird,bird2,g_disp,genome,config,show=False):
     time.sleep(0.2)
 
     dino.y = d_height * .82
+    #clock.tick(60)
 def eval_genomes(genomes,config):
     g_disp = pygame.display.set_mode((d_width, d_height))
     g_disp.fill(white)
