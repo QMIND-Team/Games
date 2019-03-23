@@ -11,6 +11,7 @@ d_height = 400
 black = (0, 0, 0)
 white = (255, 255, 255)
 red = (255, 0, 0)
+g_disp = pygame.display.set_mode((d_width, d_height))
 
 class trex(pygame.sprite.Sprite):
 
@@ -164,7 +165,7 @@ def gen_step(trees,trees2,bird,bird2,g_disp,genome,config,show=False):
     tree_count = 0
     bird_count = 0
     cloud = init_clouds()
-    floor = ground(0, d_height * .9, speed)
+    floor = ground(0, d_height * .93, speed)
     floor2 = ground(10000, 10000, speed)
     while not done:
         time_c += 1
@@ -276,12 +277,12 @@ def gen_step(trees,trees2,bird,bird2,g_disp,genome,config,show=False):
             floor.update()
             if floor.x <= -650:
                 floor.__init__(10000, 10000, speed)
-                floor2.__init__(0, d_height * .9, speed)
+                floor2.__init__(0, d_height * .93, speed)
         if floor2.y != 10000:
             floor2.update()
             if floor2.x <= -650:
                 floor2.__init__(10000, 10000, speed)
-                floor.__init__(0, d_height * .9, speed)
+                floor.__init__(0, d_height * .93, speed)
         # print("Tree ",i,": (",trees[i].x,",",trees[i].y,")")
         done = ai_game_step(action, trees=trees, trees2=trees2, bird=bird, bird2=bird2, g_disp=g_disp, cloud=cloud)
 
@@ -323,38 +324,58 @@ def gen_step(trees,trees2,bird,bird2,g_disp,genome,config,show=False):
     time.sleep(0.2)
 
     dino.y = d_height * .82
-    #clock.tick(60)
-def eval_genomes(genomes,config):
-    g_disp = pygame.display.set_mode((d_width, d_height))
+def eval_genomes_visible(genomes,config):
     g_disp.fill(white)
     for genome_id,genome in genomes:
         trees = init_trees()
         trees2 = init_trees()
         bird = init_bird()
         bird2 = init_bird()
-        gen_step(trees, trees2, bird, bird2, g_disp,genome,config)
+        gen_step(trees, trees2, bird, bird2, g_disp,genome,config,show=True)
+        print("ID: ",genome_id,"fitness: ",genome.fitness)
+def eval_genomes_non_visible(genomes,config):
+    g_disp.fill(white)
+    for genome_id,genome in genomes:
+        trees = init_trees()
+        trees2 = init_trees()
+        bird = init_bird()
+        bird2 = init_bird()
+        gen_step(trees, trees2, bird, bird2, g_disp,genome,config,show=False)
         print("ID: ",genome_id,"fitness: ",genome.fitness)
 
-
-def evolutionary_driver(config):
+def evolutionary_driver(config,show):
     p = neat.Population(config)
     p.add_reporter(neat.StdOutReporter(False))
     p.add_reporter(neat.Checkpointer(10))
-    network = p.run(eval_genomes)
+    if show:
+        network = p.run(eval_genomes_visible)
+    else:
+        network = p.run(eval_genomes_non_visible)
     return network
 config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
                          'config_dino')
 def run_best():
-    genome = evolutionary_driver(config=config)
+    genome = evolutionary_driver(config,False)
     g_disp = pygame.display.set_mode((d_width, d_height))
     trees = init_trees()
     trees2 = init_trees()
     bird = init_bird()
     bird2 = init_bird()
     gen_step(trees, trees2, bird, bird2, g_disp, genome, config,show=True)
-run_best()
 
-    #net.activate()
+def main_menu():
+    g_disp.blit(pygame.transform.scale(pygame.image.load("ai_play.png"), (300, 90)), (150, 50))
+    g_disp.blit(pygame.transform.scale(pygame.image.load("AI_Solve.png"), (300, 100)), (150, 200))
+    pygame.display.update()
+    while True:
+        for event in pygame.event.get():
+            if event.type==pygame.MOUSEBUTTONUP:
+                if pygame.mouse.get_pos()[0]>=150 and pygame.mouse.get_pos()[0]<=450 and pygame.mouse.get_pos()[1]>=50 and pygame.mouse.get_pos()[1]<=140:
+                    evolutionary_driver(config,True)
+                if pygame.mouse.get_pos()[0]>=150 and pygame.mouse.get_pos()[0]<=450 and pygame.mouse.get_pos()[1]>=200 and pygame.mouse.get_pos()[1]<=300:
+                    g_disp.fill((100,100,100))
+                    pygame.display.update()
+                    run_best()
 
-
+main_menu()
