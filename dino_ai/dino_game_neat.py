@@ -12,6 +12,7 @@ black = (0, 0, 0)
 white = (255, 255, 255)
 red = (255, 0, 0)
 g_disp = pygame.display.set_mode((d_width, d_height))
+clock = pygame.time.Clock()
 
 class trex(pygame.sprite.Sprite):
 
@@ -94,6 +95,7 @@ def ai_game_step(action,trees,trees2,bird,bird2,g_disp,cloud):
         tree.update()
     for i in cloud:
         i.update()
+    clock.tick(1000)
 
     return game_over(trees,trees2,bird,bird2,g_disp)
 
