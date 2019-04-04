@@ -51,13 +51,14 @@ def run (config_file):
     winner = p.run(eval_genomes, 50)
 
 def main():
-    if len(sys.argv)>1:
-        run(int(sys.argv[1]))
-    else:
-        run()
+    local_dir = os.path.dirname(__file__)
+    print (local_dir)
+    config_path = os.path.join(local_dir, 'config-flappy')
+    run(config_path)
 
 if __name__ == "__main__":
     # Fix working directory
     local_dir = os.path.dirname(__file__)
+    print (local_dir)
     config_path = os.path.join(local_dir, 'config-flappy')
     run(config_path)

@@ -38,7 +38,7 @@ class FastPlayer(object):
                 myGame.currentPiece.ori = oriCurrent
                 myGame.currentPiece.col = posCurrent
                 rowAddedAt = myGame.dropPiece()  # this automatically sets up pieces which is kind of wasteful and makes the following line complex
-                allOptions.append(Option.Option(myGame.grid, oriCurrent, posCurrent, 0, 0, myGame.numLinesCleared, rowAddedAt))
+                allOptions.append(Option.Option(myGame.grid, oriCurrent, posCurrent, None, None, myGame.numLinesCleared, rowAddedAt))
         return allOptions
 
     def bestOption(self, options):  # using lines cleared calculated in dropPiece would be more efficient
