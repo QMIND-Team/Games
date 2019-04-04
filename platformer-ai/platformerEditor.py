@@ -3,25 +3,37 @@ import random
 import math
 import copy
 
+# initializing pygame
 pygame.init()
 
-dh = 650
+# initializing screen sizes and display width
+dh = 650                #display size
 dw = 1300
-roomwidth = 2500
+roomwidth = 2500        #room size
 roomheight = dh
 
+# Longest path size for pathfinding algorithm
 pathmax = 100 * roomwidth
 
 # color RGB codes
 black = (0,0,0)
 white = (255,255,255)
 red = (255,0,0)
+
+#font definitions
 font = pygame.font.Font('freesansbold.ttf', 50)
 font2 = pygame.font.Font('freesansbold.ttf', 100)
 
+# initializing the pygame display and clock
 gameDisplay = pygame.display.set_mode((dw, dh))
 pygame.display.set_caption('platformer')
 clock = pygame.time.Clock()
+
+##############################################################################################################
+##############################################################################################################
+#initializing all sprites used by the game
+# make sure you have all images used in this game saved in the same directory
+# as the game code or put the directories into the load command
 
 leveleditor = pygame.image.load('leveleditor.png')
 leveledwid = 600
@@ -138,25 +150,44 @@ shortpathpos = [320,210]
 smallenemy = pygame.image.load('smallenemy.png')
 smallenemysize = 15
 
-collisionbuff = 2
-maxspeed = 3
+# End of sprites
+##############################################################################################################
+##############################################################################################################
+
+# buffer values
+
+collisionbuff = 2       # buffer for all collisions
+maxspeed = 3            # max vertical speed so does not got through ground
 maxenemyspeed = 1
 
+# list of output characteristics that need to be saved individually, used later in quickAIloop around line 1000
 speciallist = [18,19,20,21,22,23,24,25,26]
 
-# block list: each elelemt [xpos,ypos,horizontal direction,vertical direction, length]
+##############################################################################################################
+# default object spawns:
+# block list entries are modular so use integers 1, 2 .....
+# block list: each elelemt [xpos (starts left),ypos (starts top),horizontal direction (1 = left, -1 = right),
+# vertical direction (1 = down, -1 = up), length]
 defaultblocklist = [[-1, 12, 0, -1, 15], [0, dh / normblocksize - 1, 1, 0, round(roomwidth / normblocksize)], [5, 8, 1, 0, 5],
              [15, 5, 1, 0, 5], [15, 6, 0, 1, 6], [27, 11, 0, 1, 1], [31, 8, 1, 0, 5], [40, 7, 1, 0, 5],
              [44, 11, 0, -1, 4]]
+# [xpos(pixel from left),ypos(pixel from top)]
 defaultenemylist = [[1000, 500], [1600, 320], [2000, 270]]
 defaultcoinslist = [[500,200]]
 defaultmanpos = [0,dh - normblocksize - manhi]
 defaultflagpos = [2400,400]
+#end of object spawns
+##############################################################################################################
 
-gridtop = 300
+##############################################################################################################
+# initialization for user level maker
+gridtop = 300       #spawn location (top left) by pixels of grid
 gridleft = 25
 topleft = [gridleft, gridtop]
 botright = [gridleft + roomwidth * (smallblocksize / normblocksize), gridtop + dh * (smallblocksize / normblocksize)]
+
+# the following position arrays follow the same format as above
+# initializing saved positions used in user maker
 savedmanpos = [1, int((botright[1] - topleft[1]) / smallblocksize) - 2]
 savedflagpos = [int((botright[0] - topleft[0]) / smallblocksize) - 3, int((botright[1] - topleft[1]) / smallblocksize) - 5]
 savedblocks = [[0, 0, 0, 1, int((botright[1] - topleft[1]) / smallblocksize)],
@@ -168,6 +199,7 @@ savedblocks = [[0, 0, 0, 1, int((botright[1] - topleft[1]) / smallblocksize)],
 savedenemies = []
 savedcoins = []
 
+# initializing reset positions for user maker
 resetmanpos = [1, int((botright[1] - topleft[1]) / smallblocksize) - 2]
 resetflagpos = [int((botright[0] - topleft[0]) / smallblocksize) - 3, int((botright[1] - topleft[1]) / smallblocksize) - 5]
 resetblocks = [[0, 0, 0, 1, int((botright[1] - topleft[1]) / smallblocksize)],
@@ -178,7 +210,14 @@ resetblocks = [[0, 0, 0, 1, int((botright[1] - topleft[1]) / smallblocksize)],
            int((botright[1] - topleft[1]) / smallblocksize)]]
 resetenemies = []
 resetcoins = []
+# end of user lever maker initialization
+##############################################################################################################
 
+##############################################################################################################
+##############################################################################################################
+# Shortest path algorithm
+#
+# Converting blocklist into a grid of 1's and 0's
 def convertblockslisttogrid(blocklist):
     grid = []
     for i in range(0,int(roomwidth/normblocksize)):
@@ -189,25 +228,28 @@ def convertblockslisttogrid(blocklist):
         for i in range(0,blocks[4]):
             grid[int(blocks[0]+i*blocks[2])][int(blocks[1]+i*blocks[3])] = 1
     return grid
-
+# Converting a general position into a grid location (x,y) [from top left]
 def convertgridpos(thingpos,thingsize):
     return [int((thingpos[0]+thingsize[0]/2)/normblocksize),int((thingpos[1]+thingsize[1]/2)/normblocksize)]
-
+# algorithm for shortest pathfinding
 def findshortestpath(playerpos,flagpos,grid):
     playergridpos = []
-    playergridpos.append(convertgridpos(playerpos,[manwid,manhi]))
-    flaggridpos = convertgridpos(flagpos,flagsize)
-    length = 0
-    finalpos = [playergridpos[0][0],playergridpos[0][1]]
-    for locations in playergridpos:
+    playergridpos.append(convertgridpos(playerpos,[manwid,manhi]))  # start with current grid position
+    flaggridpos = convertgridpos(flagpos,flagsize)  # final goal grid position
+    length = 0  # variable used to store how much extension is needed ie shortest path
+    finalpos = [playergridpos[0][0],playergridpos[0][1]]    # final position so know when to add to length
+    for locations in playergridpos:                         # search through the grid positions (recursively)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
 
-        if locations[0] == flaggridpos[0] and locations[1] == flaggridpos[1]:
+        if locations[0] == flaggridpos[0] and locations[1] == flaggridpos[1]:       # if on flag end loop
             return length
-
+        ##############################
+        # list extending algorithm
+        # checking if blocks are around current position, if not check if
+        # position already exists in list, if not, then add to list
         if grid[locations[0]+1][locations[1]] == 0:
             flag = 0
             for positions in playergridpos:
@@ -243,24 +285,33 @@ def findshortestpath(playerpos,flagpos,grid):
                     break
             if flag == 0:
                 playergridpos.append([locations[0],locations[1]-1])
-
+        # end of list extending algorithm
+        ###########################################################
+        # if at previous end of list, then increment length and
+        # store new end of list
         if locations[0] == finalpos[0] and locations[1] == finalpos[1]:
             length = length +1
             finalpos = [playergridpos[-1][0],playergridpos[-1][1]]
 
-    return (pathmax)
+    return (pathmax)            # if no path found, return very large number so it knows no solution
 
+# is the mouse over a given object
 def mouseon(mousepos,thingpos,thingsize):  #([mouse x,mouse y],[thing x,thing y],[thingwid,thinghi]).
-    if (mousepos[0] > thingpos[0] and mousepos[0]< thingpos[0] + thingsize[0]) and (mousepos[1] > thingpos[1] and mousepos[1]< thingpos[1] + thingsize[1]):
+    if (mousepos[0] > thingpos[0] and mousepos[0]< thingpos[0] + thingsize[0]) and (
+            mousepos[1] > thingpos[1] and mousepos[1]< thingpos[1] + thingsize[1]):
         return 1
     else:
         return 0
 
-def drawgrid(topleft, botright, gridsize,width):
+#drawing the grid for the user maker loop
+def drawgrid(topleft, botright, gridsize,width): #([topleft x , topleft y],[bottom right x, bottom right y],grid spacing, width of line)
     for i in range(0,int((botright[0]-topleft[0])/gridsize)+1):
         pygame.draw.line(gameDisplay,black, (topleft[0] + gridsize*i,topleft[1]),(topleft[0] + gridsize*i,botright[1]),width)
     for i in range(0,int((botright[1]-topleft[1])/gridsize)+1):
         pygame.draw.line(gameDisplay,black, (topleft[0],topleft[1]+ gridsize*i),(botright[0],topleft[1]+ gridsize*i),width)
+
+##############################################################################################################
+# sprite display funcions
 
 def drawman(x,y):
     gameDisplay.blit(stillguy, (x, y))
@@ -297,28 +348,28 @@ def drawsmallblockstrips(blocklist, camerax,cameray):  # block list: each elelem
 def drawenemy(x,y):
     gameDisplay.blit(enemy, (x, y))
 
-def drawenemies(enemylist,camerax,cameray):
+def drawenemies(enemylist,camerax,cameray): # enemy list: each element [enemy x, enemy y]
     for enemies in enemylist:
         drawenemy(enemies[0]+dw/2-camerax,enemies[1]+dh/2-cameray)
 
 def drawsmallenemy(x,y):
     gameDisplay.blit(smallenemy, (x, y))
 
-def drawsmallenemies(enemylist,camerax,cameray):
+def drawsmallenemies(enemylist,camerax,cameray):# enemy list: each element [enemy x grid, enemy y grid]
     for enemies in enemylist:
         drawsmallenemy(enemies[0]*smallblocksize+camerax + smallenemysize/2,enemies[1]*smallblocksize+smallenemysize/2+cameray)
 
 def drawcoin(x,y):
     gameDisplay.blit(coin, (x, y))
 
-def drawcoins(coinlist,camerax,cameray):
+def drawcoins(coinlist,camerax,cameray):    # coin list: [coin x, coin y]
     for coins in coinlist:
         drawcoin(coins[0]+dw/2-camerax,coins[1]+dh/2-cameray)
 
 def drawsmallcoin(x,y):
     gameDisplay.blit(coinsmall, (x, y))
 
-def drawsmallcoins(coinlist,camerax,cameray):
+def drawsmallcoins(coinlist,camerax,cameray): # coint list [coin x grid, coin y grid]
     for coins in coinlist:
         drawsmallcoin(coins[0]*smallblocksize+camerax+2,coins[1]*smallblocksize+cameray + 2)
 
@@ -329,20 +380,27 @@ def displaycoinscore(score,coinpos):
     text = font.render(str(score),True,black)
     gameDisplay.blit(text,(coinpos[0]+coinscoresize[0],coinpos[1]))
 
+# end of sprite display functions
+##############################################################################################################
+# distance between two points on the screen
 def distancebetween(firstpos,secondpos):
     return (math.sqrt((firstpos[0]-secondpos[0])**2+(firstpos[1]-secondpos[1])**2))
 
+# check circular collision between two objects, (are their centres too close)
 def generalcirclecollision(firstpos,firstrad,secondpos,secondrad):
     if distancebetween(firstpos,secondpos) <= firstrad+secondrad:
         return 1
     else:
         return 0
 
+##############################################################################################################
+# main menu loop:
 def mainmenu():
-    mousepos = pygame.mouse.get_pos()
-    mousebuttons = pygame.mouse.get_pressed()
+    mousepos = pygame.mouse.get_pos()       # getting initial mouse position and button status
+    mousebuttons = pygame.mouse.get_pressed()   # position: [x,y] , buttons (0 or 1) [Left, right, middle]
     while 1 == 1:
         for event in pygame.event.get():
+            # if mouse attributes change, record the new values
             if event.type == pygame.MOUSEMOTION:
                 mousepos = pygame.mouse.get_pos()
             if event.type == pygame.MOUSEBUTTONUP:
@@ -353,23 +411,35 @@ def mainmenu():
                 pygame.quit()
                 quit()
 
+        # cecking is mouse left button is pressed and mouse is over a command block
+        # return the code for executing the command in the main game loop
         if mouseon(mousepos,[leveleditorx,leveleditory],[leveledwid,leveledhi]) and mousebuttons[0] == 1:
             return 1
         if mouseon(mousepos,[quickplayx,quickplayy],[quickplaywid,quickplayhi]) and mousebuttons[0] == 1:
             return 2
         if mouseon(mousepos,[quickaix,quickaiy],[quickaiwid,quickaihi]) and mousebuttons[0] == 1:
             return 3
+
+        # pygame dislay
         gameDisplay.fill(white)
         gameDisplay.blit(leveleditor,(leveleditorx,leveleditory))
         gameDisplay.blit(welcome, (welcomex, welcomey))
         gameDisplay.blit(quickplay, (quickplayx, quickplayy))
         gameDisplay.blit(quickai, (quickaix, quickaiy))
         pygame.display.update()
+#end of main menu loop
+##############################################################################################################
 
+##############################################################################################################
+# loop for user creating levels
 def leveleditorloop():
+
+    # get current mouse stats
+    # position [x,y] buttons (0 or 1) [Left, right, middle]
     mousepos = pygame.mouse.get_pos()
     mousebuttons = pygame.mouse.get_pressed()
 
+    # setting initial positions for display items
     guydispx = 70
     guydispy = 100
     enemydispx = 130
@@ -382,6 +452,9 @@ def leveleditorloop():
     flagdispy = 170
     enemyoffset = 0.2
     flagoffset = 0.4
+
+    ##############################################################################################################
+    # copying the input arguments so that they are preserved as global variables
     manpos = copy.deepcopy(savedmanpos)
     flagpos = copy.deepcopy(savedflagpos)
     blocks = copy.deepcopy(savedblocks)
@@ -399,13 +472,16 @@ def leveleditorloop():
     blockstempdef = copy.deepcopy(defaultblocklist)
     enemiestempdef = copy.deepcopy(defaultenemylist)
     coinstempdef = copy.deepcopy(defaultcoinslist)
+    ##############################################################################################################
 
-    wintype = 2
-    objtype = 0
-    rectbuffer = 12
-    rectwid = 7
+    wintype = 2     # type of win condition for the genetic algorithm
+    objtype = 0     # type of object being placed
+    rectbuffer = 12 # buffer for rectangular display outline
+    rectwid = 7     # width of the rectangular outline
     while 1 == 1:
         for event in pygame.event.get():
+            #####################################################################
+            # use key inputs to change type of block being placed
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_q:
                     return -1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
@@ -421,33 +497,54 @@ def leveleditorloop():
                     objtype = 4
                 if event.key == pygame.K_c:
                     objtype = 5
+            ##############################################################################################################
+
+            ##############################################################################################################
+            # update mouse stats if changed
             if event.type == pygame.MOUSEMOTION:
                 mousepos = pygame.mouse.get_pos()
             if event.type == pygame.MOUSEBUTTONUP:
                 mousebuttons = pygame.mouse.get_pressed()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mousebuttons = pygame.mouse.get_pressed()
+            ##############################################################################################################
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
+        ##############################################################################################################
+        # placing objects on the screen to create level
+        # if mouse button is pressed and within the bounds of the level maker grid
         if mouseon(mousepos,[topleft[0],topleft[1]],[botright[0]-topleft[0],botright[1]-topleft[1]]) and mousebuttons[0]==1:
+            # use flag to check is block is not available to be placed
+            # to prevent repeated instances on the same space
             flag = 0
-            if int((mousepos[0] - topleft[0]) / smallblocksize)<1 or int((mousepos[0] - topleft[0]) / smallblocksize)>= int(roomwidth/normblocksize)-1:
+            ####################################################################
+            # check if empty:
+            # check if on the border of the level
+            if int((mousepos[0] - topleft[0]) / smallblocksize)<1 or int((mousepos[0] - topleft[0]) / smallblocksize)>= int(
+                    roomwidth/normblocksize)-1:
                 flag = 1
             if int((mousepos[1] - topleft[1]) / smallblocksize)>=int(roomheight/normblocksize)-1:
                 flag = 1
+            # check if on an existing block string
             for block in blocks:
                 if block == [int((mousepos[0] - topleft[0]) / smallblocksize),
                              int((mousepos[1] - topleft[1]) / smallblocksize), 0, 1, 1]:
                     flag = 1
+            # check if on an existing enemy
             for enemy in enemies:
                 if enemy == [int((mousepos[0] - topleft[0]) / smallblocksize),
                              int((mousepos[1] - topleft[1]) / smallblocksize)]:
                     flag = 1
+            # check if on an existing coin
             for coin in coins:
                 if coin == [int((mousepos[0] - topleft[0]) / smallblocksize),
                             int((mousepos[1] - topleft[1]) / smallblocksize)]:
                     flag = 1
+            #########################################################################################################
+
+            #########################################################################################################
+            # if square is empty add the current type of object at that position
             if objtype == 1:
                 if flag == 0:
                     blocks.append([int((mousepos[0]-topleft[0])/smallblocksize),int((mousepos[1]-topleft[1])/smallblocksize),0,1,1])
@@ -465,7 +562,13 @@ def leveleditorloop():
                 if flag == 0:
                     coins.append(
                     [int((mousepos[0] - topleft[0]) / smallblocksize), int((mousepos[1] - topleft[1]) / smallblocksize)])
+            ######################################################################################################
+
+        ##############################################################################################################
+        # if right click then delete object at that location
         if mouseon(mousepos,[topleft[0],topleft[1]],[botright[0]-topleft[0],botright[1]-topleft[1]]) and mousebuttons[2]==1:
+            # use delete index to find if an element exists at that location
+            # if an instance is found at the current location, delete that index
             deleteindex = -1
             for i in range(0,len(blocks)):
                 if blocks[i] == [int((mousepos[0]-topleft[0])/smallblocksize),int((mousepos[1]-topleft[1])/smallblocksize),0,1,1]:
@@ -488,7 +591,10 @@ def leveleditorloop():
                     deleteindex = i
             if deleteindex >= 0:
                 del coins[deleteindex]
+        ##############################################################################################################
 
+        ##############################################################################################################
+        # if mouse clicks on a type of object, change the placing object type
         if mouseon(mousepos, [blockdispx, blockdispy], [normblocksize, normblocksize]) and mousebuttons[0] == 1:
             objtype = 1
         if mouseon(mousepos, [enemydispx, enemydispy], [enemywid, enemyhi]) and mousebuttons[0] == 1:
@@ -499,12 +605,16 @@ def leveleditorloop():
             objtype = 4
         if mouseon(mousepos, [coindispx, coindispy], smallcoinsize) and mousebuttons[0] == 1:
             objtype = 5
+        ##############################################################################################################
 
+        # mouse clicking on changing win condition type
         if mouseon(mousepos, shortpathpos, shortpathsize) and mousebuttons[0] == 1:
             wintype = 1
         if mouseon(mousepos, shortdistpos, shortdistsize) and mousebuttons[0] == 1:
             wintype = 2
 
+        ##############################################################################################################
+        # reset lists, save lists using the global and temp variables
         if mouseon(mousepos, resetpos, resetsize) and mousebuttons[0] == 1:
             manpos = copy.deepcopy(resetmanpos)
             flagpos = copy.deepcopy(resetflagpos)
@@ -525,6 +635,8 @@ def leveleditorloop():
             blockstempdef = copy.deepcopy(blocks)
             enemiestempdef = copy.deepcopy(enemies)
             coinstempdef = copy.deepcopy(coins)
+            ##########################################################################################################
+            # converting grid positions to absolute locations
             manpostempdef[0] = manpostempdef[0] * normblocksize
             manpostempdef[1] = manpostempdef[1] * normblocksize
             flagpostempdef[0] = flagpostempdef[0] * normblocksize + normblocksize*flagoffset
@@ -535,8 +647,14 @@ def leveleditorloop():
             for coin in coinstempdef:
                 coin[0] = coin[0] * normblocksize
                 coin[1] = coin[1] * normblocksize
+            ##############################################################################################################
 
+        ##############################################################################################################
+        # start user play loop using current lists if click on play
         if mouseon(mousepos,[userplayx,userplayy],[userplaywid,userplayhi]) and mousebuttons[0] ==1:
+
+            #########################################################################################################
+            #convert lists to absolute locations
             manpos[0] = manpos[0]*normblocksize
             manpos[1] = manpos[1] * normblocksize
             flagpos[0] = flagpos[0] * normblocksize + normblocksize*flagoffset
@@ -547,11 +665,20 @@ def leveleditorloop():
             for coin in coins:
                 coin[0]= coin[0]*normblocksize
                 coin[1] = coin[1] * normblocksize
+            ##############################################################################################################
+            # run user game loop
+            # if quit out of loop, return to main menu, or else return back to user maker
             if quickgameloop(blocks,enemies,manpos,flagpos,coins) == -1:
                 return -1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
             else:
                 return 1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
+        ##############################################################################################################
+
+        ##############################################################################################################
+        # start an AI learning loop with graphics
         if mouseon(mousepos, [ailearnx, ailearny], [ailearnwid, ailearnhi]) and mousebuttons[0] == 1:
+            #########################################################################################################
+            # convert lists to absolute grid positions
             manpos[0] = manpos[0] * normblocksize
             manpos[1] = manpos[1] * normblocksize
             flagpos[0] = flagpos[0] * normblocksize+ normblocksize*flagoffset
@@ -562,11 +689,21 @@ def leveleditorloop():
             for coin in coins:
                 coin[0]= coin[0]*normblocksize
                 coin[1] = coin[1] * normblocksize
+            ##############################################################################################################
+
+            # run AI loop with graphics
+            # if quit out of it return to main menu, or else return to user maker
             if quickAIloop(blocks, enemies, manpos,1,flagpos,coins,wintype) ==-1:
                 return -1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
             else:
                 return 1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
+        ##############################################################################################################
+
+        ##############################################################################################################
+        # run AI loop without graphics if clicked on
         if mouseon(mousepos, [aifinishx, aifinishy], [aifinishwid, aifinishhi]) and mousebuttons[0] == 1:
+            ########################################################################################################
+            # convert lists to absolute grid positions
             manpos[0] = manpos[0] * normblocksize
             manpos[1] = manpos[1] * normblocksize
             flagpos[0] = flagpos[0] * normblocksize+ normblocksize*flagoffset
@@ -577,11 +714,19 @@ def leveleditorloop():
             for coin in coins:
                 coin[0]= coin[0]*normblocksize
                 coin[1] = coin[1] * normblocksize
+            ##############################################################################################################
+
+            # if quit out of loop, return to main menu, else go back to user maker
             if quickAIloop(blocks, enemies, manpos,0,flagpos,coins,wintype) ==-1:
                 return -1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
             else:
                 return 1,[manpostempsaved,flagpostempsaved,blockstempsaved,enemiestempsaved,coinstempsaved],[manpostempdef,flagpostempdef,blockstempdef,enemiestempdef,coinstempdef]
+        ##############################################################################################################
+
         gameDisplay.fill(white)
+
+        ##############################################################################################################
+        # draw a rectange aroud the current object type and win condition
         if objtype == 1:
             pygame.draw.rect(gameDisplay, red, [blockdispx - rectbuffer,blockdispy - rectbuffer,normblocksize+2*rectbuffer,normblocksize+2*rectbuffer],rectwid)
         if objtype == 2:
@@ -597,8 +742,10 @@ def leveleditorloop():
             pygame.draw.rect(gameDisplay, black, [shortpathpos[0] - rectbuffer,shortpathpos[1] - rectbuffer,shortpathsize[0]+2*rectbuffer,shortpathsize[1]+2*rectbuffer],rectwid)
         if wintype == 2:
             pygame.draw.rect(gameDisplay, black, [shortdistpos[0] - rectbuffer,shortdistpos[1] - rectbuffer,shortdistsize[0]+2*rectbuffer,shortdistsize[1]+2*rectbuffer],rectwid)
+        ##############################################################################################################
 
-
+        ##############################################################################################################
+        # pygame display images
         drawgrid(topleft, botright, smallblocksize, 1)
         drawsmallman(manpos[0]*smallblocksize+topleft[0]+ smallmanwid/2,manpos[1]*smallblocksize+topleft[1])
         drawsmallenemies(enemies,topleft[0],topleft[1])
@@ -620,12 +767,16 @@ def leveleditorloop():
         drawblock(blockdispx, blockdispy)
         drawsmallflag([flagdispx,flagdispy])
         drawsmallcoin(coindispx,coindispy)
+        ##############################################################################################################
 
         pygame.display.update()
 
+##############################################################################################################
+# loop for AI playing through a game generation
 def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput,manpos,graphics,previousdatainput,generation,genswait,flagpos,coinlist,wintype):
+    # copy the previous data as not to overwrite it
     previousdata = copy.deepcopy(previousdatainput)
-
+    # copy the enemy list as not to overrite it
     enemylist = []
     i = 0
     for enemy in enemylistinput:
@@ -634,16 +785,25 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             blah = things
             enemylist[i].append(blah)
         i = i + 1
-    enbouncesp = 2
-    clockspeed = 1000  # 300 ideal
-    horspeed = 1.2
-    enspeed = 0.8
-    #roomwidth = 3000
-    roomheight = dh
-    screenbuffer = 300
-    jumpspeed = 3.8
-    gravacc = 0.03
 
+    ############################################################################################################
+    # defining variables
+    enbouncesp = 2  # vertical speed to bounce off enemies
+    clockspeed = 1000  # speed of game frame rate
+    horspeed = 1.2      # player horizontal speed
+    enspeed = 0.8       # enemy horizontal speed
+    #roomwidth = 3000
+    roomheight = dh     # height of the room (display height)
+    screenbuffer = 300  # how close to get to boundary before movng camera
+    jumpspeed = 3.8     # upward speed of jump
+    gravacc = 0.03      # accelleration due to gravity
+    ##############################################################################################################
+
+    ##############################################################################################################
+    # previous state initializations for no graphics to speed things up
+    # if graphics is on or first round of generations
+    # or no previous data, then start from beginning
+    # initialize values to starting values
     if graphics == 1 or generation <= genswait or previousdata == 0:
         dead = []
         manxabs= []
@@ -664,6 +824,7 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
         goodcoll = []
         collindex = []
 
+        # initialize for each player in the generation
         for _ in playerlists:
             dead.append(0)
             manxabs.append(manpos[0])
@@ -683,16 +844,18 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             goodcoll.append(0)
             collindex.append(0)
 
-        # block list: each elelemt [xpos,ypos,horizontal direction,vertical direction, length]
+        # starts each enemy moving left
         enemyspeeds = []
         for _ in enemylist:
             enemyspeeds.append([-enspeed,0])
 
+        # initialize dead enemies to 0 to react to enemies
         for i in range(0,len(playerlists)):
             deadenemies.append([])
             for _ in enemylist:
                 deadenemies[i].append(0)
 
+        # enemy collision stats, 1 means not hit a wall
         encollef = []
         encolrig = []
         encoltop = []
@@ -704,6 +867,7 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             encoltop.append(1)
             encolbot.append(1)
 
+        # initialize camera position
         if manxabs[0] <= dw / 2 - 20:
             camerax = dw / 2 - 20
         elif manxabs[0] >= roomwidth - dw / 2 + 10:
@@ -712,7 +876,9 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             camerax = manxabs[0]
         cameray = dh/2
 
+        # intilize frame count
         frame = 0
+    # if running no graphics, need to initialize to previous data
     else:
         dead = previousdata[0]
         manxabs = previousdata[1]
@@ -741,10 +907,13 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
         cameray = previousdata[24]
         frame = previousdata[25]
         enemylist = previousdata[26]
+    ##############################################################################################################
 
+    ##############################################################################################################
+    # actual running the game loop until run frames to end of generation
     while frame < currsteps:
         #
-        #check user input
+        # check user input for quit commands and slow motion
         #
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
@@ -760,27 +929,34 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
-        #
-        #motion stuff here
-        #
+
+        ##############################################################################################################
+        # enemy and player motion calcuations
+        # only move when not collided with walls and not dead
+        # acheived using bollean operations with the flags
+        # also capped by max vertical speed to prevent falling through floor
         for i in range(0,len(enemylist)):
-            enemyspeeds[i][1]=(enemyspeeds[i][1]+gravacc*encoltop[i])*(enemyspeeds[i][1]<maxenemyspeed)+maxenemyspeed*(enemyspeeds[i][1]>=maxenemyspeed)
+            enemyspeeds[i][1]=(enemyspeeds[i][1]+gravacc*encoltop[i])*(enemyspeeds[i][1]<maxenemyspeed)+maxenemyspeed*(
+                    enemyspeeds[i][1]>=maxenemyspeed)
             enemylist[i][1]=enemylist[i][1]+enemyspeeds[i][1]
 
             enemylist[i][0] = enemylist[i][0]+enemyspeeds[i][0]
         for i in range(0,len(playerlists)):
             if dead[i]==0:
-                manxabs[i] = manxabs[i]+(-horspeed*(playerlists[i][int(frame/repeat)] == 0 or playerlists[i][int(frame/repeat)] == 3))*rightcoll[i]+(horspeed*(playerlists[i][int(frame/repeat)] == 1 or playerlists[i][int(frame/repeat)] == 4))*leftcoll[i]
+                manxabs[i] = manxabs[i]+(-horspeed*(playerlists[i][int(frame/repeat)] == 0 or playerlists[i][int(
+                    frame/repeat)] == 3))*rightcoll[i]+(horspeed*(playerlists[i][int(frame/repeat)] == 1 or playerlists[i][
+                    int(frame/repeat)] == 4))*leftcoll[i]
                 manxrel[i] = manxabs[i]+dw/2-camerax
 
                 manyspeed[i] = (manyspeed[i] + gravacc*topcoll[i])*(manyspeed[i] < maxspeed)+maxspeed*(manyspeed[i]>=maxspeed)
                 manyabs[i] = manyabs[i] + manyspeed[i]
                 manyrel[i] = manyabs[i] + dh/2 - cameray
+        ##############################################################################################################
 
-        #
-        #display stuff here
-        #
+        ##############################################################################################################
+        # display if graphics is set on
         if graphics == 1:
+            # decide which player is closest to flag to follow with camera
             distances = []
             for i in range(0,len(manyabs)):
                 distances.append(distancebetween([manxabs[i],manyabs[i]],flagpos))
@@ -797,10 +973,11 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             drawcoins(coinlist, camerax, cameray)
             drawenemies(enemylist,camerax,cameray)
             drawflag(flagpos,camerax,cameray)
-
+            # draw all of the player still alive
             for i in range(0,len(playerlists)):
                 if dead[i] == 0:
                    drawman(manxrel[i], manyrel[i])
+        # if no graphics display the current generation
         else:
             gameDisplay.fill(white)
             text = font.render("AI LEARNING PLEASE WAIT", True, black)
@@ -809,12 +986,14 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             gameDisplay.blit(text,(360,230))
             text = font2.render("GENERATION  " + str(generation), True, (126,30,200))
             gameDisplay.blit(text, (250, 400))
-        #
-        #game checks here
-        #
-        #block string collision checks
+        ##############################################################################################################
 
+    ##############################################################################################################
+    # checking game collisions
+        ##############################################################################################################
+        # collisions of players with blocks and enemies with blocks
         for i in range(0,len(playerlists)):
+            # initialize flag variables
             blkchncollef[i] = 0
             blkchncolrig[i] = 0
             blkchncolup[i] = 0
@@ -823,6 +1002,7 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             goodcoll[i] = 0
             collindex[i] = -1
 
+        # initialize flag variables
         encollef = []
         encolrig = []
         encoltop = []
@@ -835,80 +1015,125 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             encolbot.append(1)
 
         for blocks in blocklist:
+            # calculate the boundary of each block chain
             lbound = normblocksize * (blocks[0] * (blocks[2] != -1) + (blocks[0] - blocks[4] + 1) * (blocks[2] == -1))
             rbound = normblocksize * ((blocks[0] + blocks[4]) * (blocks[2] == 1) + (blocks[0] + 1) * (blocks[2] != 1))
             ubound = normblocksize * (blocks[1] * (blocks[3] != -1) + (blocks[1] - blocks[4] + 1) * (blocks[3] == -1))
             dbound = normblocksize * ((blocks[1] + blocks[4]) * (blocks[3] == 1) + (blocks[1] + 1) * (blocks[3] != 1))
 
+            ##############################################################################################################
+            # check for collisions of player with block
             for i in range(0,len(playerlists)):
-                if (manxabs[i] >= lbound - manwid - collisionbuff and manxabs[i] <= lbound - manwid + collisionbuff) and ((manyabs[i] >= ubound and manyabs[i] <= dbound) or (manyabs[i] + manhi >= ubound and manyabs[i] + manhi <= dbound) or (manyabs[i] + manhi <= dbound and manyabs[i] >= ubound)):
+                # left collision
+                if (manxabs[i] >= lbound - manwid - collisionbuff and manxabs[i] <= lbound - manwid + collisionbuff) and (
+                        (manyabs[i] >= ubound and manyabs[i] <= dbound) or (manyabs[i] + manhi >= ubound and manyabs[
+                    i] + manhi <= dbound) or (manyabs[i] + manhi <= dbound and manyabs[i] >= ubound)):
                     blkchncollef[i] = 1
-                if (manxabs[i] >= rbound - collisionbuff and manxabs[i] <= rbound + collisionbuff) and ((manyabs[i] >= ubound and manyabs[i] <= dbound) or (manyabs[i] + manhi >= ubound and manyabs[i] + manhi <= dbound) or (manyabs[i] + manhi <= dbound and manyabs[i] >= ubound)):
+                # right collisions
+                if (manxabs[i] >= rbound - collisionbuff and manxabs[i] <= rbound + collisionbuff) and (
+                        (manyabs[i] >= ubound and manyabs[i] <= dbound) or (manyabs[i] + manhi >= ubound and manyabs[
+                    i] + manhi <= dbound) or (manyabs[i] + manhi <= dbound and manyabs[i] >= ubound)):
                     blkchncolrig[i] = 1
-                if (manyabs[i]>= dbound - collisionbuff and manyabs[i]<= dbound + collisionbuff) and ((manxabs[i]>= lbound and manxabs[i]<= rbound) or (manxabs[i]+ manwid >= lbound and manxabs[i]+ manwid <= rbound) or (manxabs[i]+ manwid <= rbound and manxabs[i]>= lbound)):
+                # collisions with bottom of block
+                if (manyabs[i]>= dbound - collisionbuff and manyabs[i]<= dbound + collisionbuff) and (
+                        (manxabs[i]>= lbound and manxabs[i]<= rbound) or (manxabs[i]+ manwid >= lbound and manxabs[
+                    i]+ manwid <= rbound) or (manxabs[i]+ manwid <= rbound and manxabs[i]>= lbound)):
                     blkchncoldow[i] = 1
+                    # need to stop moving vertically
                     manyspeed[i] = 0
-                if (manyabs[i]+ manhi >= ubound - collisionbuff and manyabs[i]+ manhi <= ubound + collisionbuff) and ((manxabs[i]>= lbound and manxabs[i]<= rbound) or (manxabs[i]+ manwid >= lbound and manxabs[i]+ manwid <= rbound) or (manxabs[i]+ manwid <= rbound and manxabs[i]>= lbound)):
+                # collision with top of block (ie ground)
+                if (manyabs[i]+ manhi >= ubound - collisionbuff and manyabs[i]+ manhi <= ubound + collisionbuff) and (
+                        (manxabs[i]>= lbound and manxabs[i]<= rbound) or (manxabs[i]+ manwid >= lbound and manxabs[
+                    i]+ manwid <= rbound) or (manxabs[i]+ manwid <= rbound and manxabs[i]>= lbound)):
                     blkchncolup[i] = 1
+                    # if trying to jump then jump or else stop
                     if playerlists[i][int(frame/repeat)] >= 2:
                         manyspeed[i] = -jumpspeed
                     else:
                         manyspeed[i] = 0
+            ##############################################################################################################
+
+            ##############################################################################################################
+            # check enemy collisions with blocks
             for i in range(0,len(enemylist)):
+                # left collision
                 if (enemylist[i][0] >= lbound - enemywid - collisionbuff and enemylist[i][0] <= lbound - enemywid + collisionbuff) and (
                         (enemylist[i][1] >= ubound and enemylist[i][1] <= dbound) or (
                         enemylist[i][1] + enemyhi >= ubound and enemylist[i][1] + enemyhi <= dbound) or (
                                 enemylist[i][1] + enemyhi <= dbound and enemylist[i][1] >= ubound)):
                     encollef[i] = 0
+                    # bounce off wall
                     enemyspeeds[i][0]=-enemyspeeds[i][0]
+                # right collision
                 if (enemylist[i][0] >= rbound - collisionbuff and enemylist[i][0] <= rbound + collisionbuff) and (
                         (enemylist[i][1] >= ubound and enemylist[i][1] <= dbound) or (
                         enemylist[i][1] + enemyhi >= ubound and enemylist[i][1] + enemyhi <= dbound) or (
                         enemylist[i][1] + enemyhi <= dbound and enemylist[i][1] >= ubound)):
                     encolrig[i] = 0
+                    # bounce off wall
                     enemyspeeds[i][0] = -enemyspeeds[i][0]
+                # collision with bottom
                 if (enemylist[i][1] >= dbound - collisionbuff and enemylist[i][1] <= dbound + collisionbuff) and (
                         (enemylist[i][0] >= lbound and enemylist[i][0] <= rbound) or (
                         enemylist[i][0] + enemywid >= lbound and enemylist[i][0] + enemywid <= rbound) or (
                         enemylist[i][0] + enemywid <= rbound and enemylist[i][0] >= lbound)):
                     encolbot[i] = 0
+                    # stop moving up
                     enemyspeeds[i][1] = 0
+                # collision with top
                 if (enemylist[i][1] + enemyhi >= ubound - collisionbuff and enemylist[i][1] + enemyhi <= ubound + collisionbuff) and (
                         (enemylist[i][0] >= lbound and enemylist[i][0] <= rbound) or (
                         enemylist[i][0] + enemywid >= lbound and enemylist[i][0] + enemywid <= rbound) or (
                         enemylist[i][0] + enemywid <= rbound and enemylist[i][0] >= lbound)):
                     encoltop[i] = 0
+                    # stop moving down
                     enemyspeeds[i][1] = 0
+                ##############################################################################################################
+        ##############################################################################################################
 
+        ##############################################################################################################
+        # player to enemy collisoion checks
         for i in range(0,len(enemylist)):
             for j in range(0,len(playerlists)) :
+                # left collision
                 if (enemylist[i][0] >= manxabs[j]- enemywid - collisionbuff and enemylist[i][
                     0] <= manxabs[j]- enemywid + collisionbuff) and (
                         (enemylist[i][1] >= manyabs[j]and enemylist[i][1] <= manyabs[j]+manhi) or (
                         enemylist[i][1] + enemyhi >= manyabs[j]and enemylist[i][1] + enemyhi <= manyabs[j]+manhi) or (
                                 enemylist[i][1] + enemyhi <= manyabs[j]+manhi and enemylist[i][1] >= manyabs[j])):
+                    # death of player
                     deathcoll[j] = 1
                     collindex[j] = i
+                #right collision
                 if (enemylist[i][0] >= manxabs[j]+manwid - collisionbuff and enemylist[i][0] <= manxabs[j]+manwid + collisionbuff) and (
                         (enemylist[i][1] >= manyabs[j]and enemylist[i][1] <= manyabs[j]+manhi) or (
                         enemylist[i][1] + enemyhi >= manyabs[j]and enemylist[i][1] + enemyhi <= manyabs[j]+manhi) or (
                                 enemylist[i][1] + enemyhi <= manyabs[j]+manhi and enemylist[i][1] >= manyabs[j])):
+                    # death of player
                     deathcoll[j] = 1
                     collindex[j] = i
+                # top collision
                 if (enemylist[i][1] >= manyabs[j]+manhi - collisionbuff-10 and enemylist[i][1] <= manyabs[j]+ manhi + collisionbuff+10) and (
                         (enemylist[i][0] >= manxabs[j]and enemylist[i][0] <= manxabs[j]+manwid) or (
                         enemylist[i][0] + enemywid >= manxabs[j]and enemylist[i][0] + enemywid <= manxabs[j]+manwid) or (
-                                enemylist[i][0] + enemywid <= manxabs[j]+manwid and enemylist[i][0] >= manxabs[j]) or (manxabs[j]>= enemylist[i][0] and manxabs[j]+ manwid <= enemylist[i][0]+enemywid)):
+                                enemylist[i][0] + enemywid <= manxabs[j]+manwid and enemylist[i][0] >= manxabs[j]) or (
+                        manxabs[j]>= enemylist[i][0] and manxabs[j]+ manwid <= enemylist[i][0]+enemywid)):
+                    # death of enemy
                     goodcoll[j] = 1
                     collindex[j] = i
+                # bottom collision
                 if (enemylist[i][1] + enemyhi >= manyabs[j]- collisionbuff and enemylist[i][
                     1] + enemyhi <= manyabs[j]+ collisionbuff) and (
                         (enemylist[i][0] >= manxabs[j]and enemylist[i][0] <= manxabs[j]+manwid) or (
                         enemylist[i][0] + enemywid >= manxabs[j]and enemylist[i][0] + enemywid <= manxabs[j]+manwid) or (
-                                enemylist[i][0] + enemywid <= manxabs[j]+manwid and enemylist[i][0] >= manxabs[j]) or (manxabs[j]>= enemylist[i][0] and manxabs[j]+ manwid <= enemylist[i][0]+enemywid)):
+                                enemylist[i][0] + enemywid <= manxabs[j]+manwid and enemylist[i][0] >= manxabs[j]) or (
+                        manxabs[j]>= enemylist[i][0] and manxabs[j]+ manwid <= enemylist[i][0]+enemywid)):
+                    # death of player
                     deathcoll[j] = 1
                     collindex[j] = i
-         # flag collision check
+        ##############################################################################################################
+
+        # flag collision check
         for i in range(0,len(playerlists)):
             if (((manxabs[i] + manwid >= flagpos[0] + flagoffset[0] and manxabs[i] + manwid <= flagpos[0] + flagsize[0] -flagoffset[0]) or (
                              manxabs[i] >= flagpos[0] + flagoffset[0] and manxabs[i] <= flagpos[0] + flagsize[0] - flagoffset[
@@ -916,10 +1141,13 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
                                     flagoffset[1]) or (manyabs[i] + manhi <= flagpos[1] + flagsize[1] - flagoffset[
                     1] and manyabs[i] + manhi >= flagpos[1] + flagoffset[1]))):
                 print("THIS SHOULD REACH FLAG")
+                # return winning player index
                 return 2,i
 
-        #general collision checks
+        ##############################################################################################################
+        # general collision checks
         for i in range(0,len(playerlists)):
+            # convert block collions into general collisions for each player
             if blkchncolup[i] == 1:
                 topcoll[i] = 0
             else:
@@ -936,6 +1164,7 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
                 botcoll[i] = 0
             else:
                 botcoll[i] = 1
+            # kill player if collided badly with enemy
             if collindex[i] != -1:
                 if deathcoll[i] == 1 and deadenemies[i][collindex[i]]== 0:
                     dead[i] = 1
@@ -944,16 +1173,19 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
                     if playerlists[i][int(frame/repeat)] >= 2:
                         manyspeed[i] = -jumpspeed
                     deadenemies[i][collindex[i]] = 1
+        ##############################################################################################################
 
-
-        #
-        #end loop stuff
-        #
+        # update display and increment frame
         pygame.display.update()
         clock.tick(clockspeed)
         frame = frame+1
+
+    ##############################################################################################################
+    # prepare output data
     outdata = []
     blockgrid = convertblockslisttogrid(blocklist)
+
+    # calculate win condition for each player
     for i in range(0,len(playerlists)):
         #outdata.append(math.sqrt(manxabs[i]**2+(roomheight-manyabs[i])**2))      # win condition function
         #outdata.append(distancebetween([manxabs[i],manyabs[i]],flagpos))
@@ -965,6 +1197,7 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
             if wintype == 2:
                 outdata.append(distancebetween([manxabs[i], manyabs[i]], flagpos))
 
+    # if at end of a generation cycle, save new state to be reloaded
     if generation%genswait == 0:
         restoredata = []
         restoredata.append(dead)
@@ -995,19 +1228,28 @@ def quickAIgame(playerlists,currsteps,repeat,totalsteps,blocklist,enemylistinput
         restoredata.append(frame)
         restoredata.append(enemylist)
         return (outdata,restoredata)
+    # if not at end of generation cycle, return previous data
     else:
         return (outdata,previousdatainput)
 
+##############################################################################################################
+# Genetic algorithm AI execution
 def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist,wintype):
-    numplayers = 10
-    genswait = 2
-    finalgen = 100
-    playersteps = []
-    keepers = 2
-    mutation = 0.66
-    repeat = 48
-    stepsadded = 3  # THIS FACTOR IS NUMBER OF CHOICES
-    totalsteps = stepsadded
+    ##############################################################################################################
+    # initialize evolution parameters
+    numplayers = 200   # number of players per batch
+    genswait = 2       # generations before adding more steps to the batch
+    finalgen = 20      # generations before quitting if not reached flag
+    playersteps = []   # array for storing the players' choices
+    keepers = 10       # number of top players choices that are brought to next gen
+    mutation = 0.33    # chance of mutating each move when mutating
+    repeat = 48        # number of frames each choice is executed for (makes more smooth motions)
+    stepsadded = 7     # THIS FACTOR IS NUMBER OF CHOICES added per generations waited
+    totalsteps = stepsadded     # keeping track of current number of choices for the generation
+    ##############################################################################################################
+
+    ##############################################################################################################
+    # initializing random choices to start
     # generate random directions, 0 = LEFT, 1 = RIGHT, 2 = UP, 3 = Up LEFT, 4 = up RIGHT
     for i in range(0, numplayers):
         playersteps.append([])
@@ -1015,9 +1257,14 @@ def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist,wintype):
             playersteps[i].append(
                 random.randint(0, 4))  # implement -1 to introduce stopping, put at mutation as well, end of program
             # while playersteps[i] == 2:
-            #   playersteps[i] = random.randint(0,4)           ELIMINATES OPTION 2 (jump straight)
+            #   playersteps[i] = random.randint(0,4)           #ELIMINATES OPTION 2 (jump straight)
+    ##############################################################################################################
+
     winnersteps = []
     restoredata = []
+
+    ##############################################################################################################
+    # check for quit commands
     for generation in range(1, finalgen + 1):
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
@@ -1029,41 +1276,56 @@ def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist,wintype):
                 pygame.quit()
                 quit()
         savedata = []
+    ##############################################################################################################
 
+        # run an AI game loop with current generation stats
         testdata,restoredata = quickAIgame(playersteps, totalsteps * repeat,repeat,totalsteps,blocklist,enemylist,manpos,graphics,restoredata,generation,genswait,flagpos,coinlist,wintype)
         print("finished generation", generation)
 
+        ##############################################################################################################
+        # check for quit commands from AI loop
         if testdata == -1:
             return -1
         if testdata == 1:
             return 1
-        if testdata == 2:
-            # winnersteps = playersteps[testdata.index(max(testdata))]
+        if testdata == 2: # if found flag
+            # find the index of the winning player and store steps
+            # winnersteps = playersteps[testdata.index(max(testdata))]  # alternate when not using find algorithm
             winnersteps = playersteps[restoredata]
             print("THIS REALLY SHOULD REACH FLAG")
             break
+        # if flag identified as impossible break out of loop
         if min(testdata) == pathmax:
             print("Could Not Solve")
             return 1
+        ##############################################################################################################
 
+        # if at end of generations, return the best possible player
         if generation == finalgen:
             # winnersteps = playersteps[testdata.index(max(testdata))]
             winnersteps = playersteps[testdata.index(min(testdata))]
             break
 
         saverestore = []
-        for i in range(0, len(restoredata)):  # CAN CHANGE ALL OF THESE 7s TO LEN(RESTOREDATA) SHOULD GET RID OF BUGS
+        for i in range(0, len(restoredata)):
             saverestore.append([])
 
+        ##############################################################################################################
+        # EVOLVING ALGORITHM
+        # Speciallist: values that must be handled specially because they are not dependent on the player
         if generation >= genswait:
             for i in speciallist:
                 saverestore[i].append(restoredata[i])
+            #########################################################################################################
+            #ISOLATE BEST PLAYERS OF THE GENERATION
         for _ in range(0, keepers):
             #goodindex = testdata.index(max(testdata))
             goodindex = testdata.index(min(testdata))
             savedata.append(playersteps[goodindex])
+            # make a copy of the best player if past the first round of steps
+            # with special handling of special list
             if generation >= genswait:
-                for i in range(0, len(restoredata)):            #CAN CHANGE ALL OF THESE 7s TO LEN(RESTOREDATA) SHOULD GET RID OF BUGS
+                for i in range(0, len(restoredata)):
                     flag = 0
                     for item in speciallist:
                         if item == i:
@@ -1071,43 +1333,66 @@ def quickAIloop(blocklist,enemylist,manpos,graphics,flagpos,coinlist,wintype):
                     if flag == 0:
                         saverestore[i].append(restoredata[i][goodindex])
                         del restoredata[i][goodindex]
+            # delete that player data to find the next best
             del testdata[goodindex]
             del playersteps[goodindex]
+            #########################################################################################################
+
+        # add more steps if at end of round
         if generation % genswait == 0 and generation != finalgen:
             totalsteps = totalsteps + stepsadded
+
+        ##############################################################################################################
+        # mutations to create next player steps using saverestore and savedata
+        # if past first round of generation steps
         playersteps = []
         if generation >= genswait:
-            for i in range(0,len(restoredata)):    #CAN CHANGE ALL OF THESE 7s TO LEN(RESTOREDATA) SHOULD GET RID OF BUGS
+            for i in range(0,len(restoredata)):
                 restoredata[i] = []
+            # copy all special list values becasue independent of player
             for i in speciallist:
                 restoredata[i].append(saverestore[i][0])
                 restoredata[i] = restoredata[i][0]
         for k in range(0, round(numplayers / len(savedata))):
             for j in range(0, len(savedata)):
                 playersteps.append([])
+                #######################################################################################################
+                # making restore data for the new players
                 if generation >= genswait:
-                    for i in range(0,len(restoredata)):    #CAN CHANGE ALL OF THESE 7s TO LEN(RESTOREDATA) SHOULD GET RID OF BUGS
+                    for i in range(0,len(restoredata)):
                         flag = 0
                         for item in speciallist:
                             if item == i:
                                 flag = 1
                         if flag == 0:
+                            # special handling of deadenemies - need to make deepcopy so they are not
+                            # linked for each player's copy
                             if i == 6:
                                 restoredata[i].append(copy.deepcopy(saverestore[i][j]))
                             else:
                                 restoredata[i].append(saverestore[i][j])
+                ##############################################################################################################
+
+                ##############################################################################################################
+                # making player steps (with mutations) of new generation
                 for i in range(0, totalsteps):
+                    # preserve the steps that have already been trained
                     if i < totalsteps - stepsadded:
                         playersteps[k * len(savedata) + j].append(savedata[j][i])
+                    # change the "new" steps with probability of the mutation rate
                     elif generation % genswait == 0 or random.randint(0, 100) <= mutation * 100:
                         playersteps[k * len(savedata) + j].append(random.randint(0, 4))             #change to -1 to introduce stopping
                     else:
                         playersteps[k * len(savedata) + j].append(savedata[j][i])
+                ##############################################################################################################
 
         pygame.display.update()
+    # play the obtained solution to show the user the AI reaching the flag
     quickAIgame([winnersteps], totalsteps * repeat, repeat, totalsteps, blocklist, enemylist, manpos,1,0,finalgen,genswait,flagpos,coinlist,wintype)
     return 1
 
+##############################################################################################################
+# user play loop (very similar to AI game so see above for details)
 def quickgameloop(blocklist,enemylistinput,manpos,flagpos,coinlistinput):
     coinlist = copy.deepcopy(coinlistinput)
     enemylist = []
@@ -1217,7 +1502,8 @@ def quickgameloop(blocklist,enemylistinput,manpos,flagpos,coinlistinput):
         manyrel = manyabs + dh/2 - cameray
 
         for i in range(0,len(enemylist)):
-            enemyspeeds[i][1]=(enemyspeeds[i][1]+gravacc*encoltop[i])*(enemyspeeds[i][1]<maxenemyspeed)+maxenemyspeed*(enemyspeeds[i][1]>=maxenemyspeed)
+            enemyspeeds[i][1]=(enemyspeeds[i][1]+gravacc*encoltop[i])*(enemyspeeds[i][1]<maxenemyspeed)+maxenemyspeed*(
+                    enemyspeeds[i][1]>=maxenemyspeed)
             enemylist[i][1]=enemylist[i][1]+enemyspeeds[i][1]
 
             enemylist[i][0] = enemylist[i][0]+enemyspeeds[i][0]
@@ -1266,14 +1552,22 @@ def quickgameloop(blocklist,enemylistinput,manpos,flagpos,coinlistinput):
             rbound = normblocksize*((blocks[0]+blocks[4])*(blocks[2] == 1) + (blocks[0]+1)*(blocks[2] != 1))
             ubound = normblocksize * (blocks[1] * (blocks[3] != -1) + (blocks[1] - blocks[4] + 1) * (blocks[3] == -1))
             dbound = normblocksize * ((blocks[1] + blocks[4]) * (blocks[3] == 1) + (blocks[1] + 1) * (blocks[3] != 1))
-            if (manxabs >= lbound - manwid - collisionbuff and manxabs <= lbound - manwid + collisionbuff) and ((manyabs >= ubound and manyabs <= dbound) or (manyabs + manhi >= ubound and manyabs + manhi <= dbound) or (manyabs + manhi <= dbound and manyabs >= ubound)):
+            if (manxabs >= lbound - manwid - collisionbuff and manxabs <= lbound - manwid + collisionbuff) and (
+                    (manyabs >= ubound and manyabs <= dbound) or (manyabs + manhi >= ubound and manyabs + manhi <= dbound) or (
+                    manyabs + manhi <= dbound and manyabs >= ubound)):
                 blkchncollef = 1
-            if (manxabs >= rbound - collisionbuff and manxabs <= rbound + collisionbuff) and ((manyabs >= ubound and manyabs <= dbound) or (manyabs + manhi >= ubound and manyabs + manhi <= dbound) or (manyabs + manhi <= dbound and manyabs >= ubound)):
+            if (manxabs >= rbound - collisionbuff and manxabs <= rbound + collisionbuff) and (
+                    (manyabs >= ubound and manyabs <= dbound) or (manyabs + manhi >= ubound and manyabs + manhi <= dbound) or (
+                    manyabs + manhi <= dbound and manyabs >= ubound)):
                 blkchncolrig = 1
-            if (manyabs >= dbound - collisionbuff and manyabs <= dbound + collisionbuff) and ((manxabs >= lbound and manxabs <= rbound) or (manxabs + manwid >= lbound and manxabs + manwid <= rbound) or (manxabs + manwid <= rbound and manxabs >= lbound)):
+            if (manyabs >= dbound - collisionbuff and manyabs <= dbound + collisionbuff) and (
+                    (manxabs >= lbound and manxabs <= rbound) or (manxabs + manwid >= lbound and manxabs + manwid <= rbound) or (
+                    manxabs + manwid <= rbound and manxabs >= lbound)):
                 blkchncoldow = 1
                 manyspeed = 0
-            if (manyabs + manhi >= ubound - collisionbuff and manyabs + manhi <= ubound + collisionbuff) and ((manxabs >= lbound and manxabs <= rbound) or (manxabs + manwid >= lbound and manxabs + manwid <= rbound) or (manxabs + manwid <= rbound and manxabs >= lbound)):
+            if (manyabs + manhi >= ubound - collisionbuff and manyabs + manhi <= ubound + collisionbuff) and (
+                    (manxabs >= lbound and manxabs <= rbound) or (manxabs + manwid >= lbound and manxabs + manwid <= rbound) or (
+                    manxabs + manwid <= rbound and manxabs >= lbound)):
                 blkchncolup = 1
                 if udir == 1:
                     manyspeed = -jumpspeed
@@ -1325,14 +1619,16 @@ def quickgameloop(blocklist,enemylistinput,manpos,flagpos,coinlistinput):
             if (enemylist[i][1] >= manyabs+manhi - collisionbuff-10 and enemylist[i][1] <= manyabs + manhi + collisionbuff+10) and (
                     (enemylist[i][0] >= manxabs and enemylist[i][0] <= manxabs+manwid) or (
                     enemylist[i][0] + enemywid >= manxabs and enemylist[i][0] + enemywid <= manxabs+manwid) or (
-                            enemylist[i][0] + enemywid <= manxabs+manwid and enemylist[i][0] >= manxabs) or (manxabs >= enemylist[i][0] and manxabs + manwid <= enemylist[i][0]+enemywid)):
+                            enemylist[i][0] + enemywid <= manxabs+manwid and enemylist[i][0] >= manxabs) or (
+                    manxabs >= enemylist[i][0] and manxabs + manwid <= enemylist[i][0]+enemywid)):
                 goodcoll = 1
                 collindex = i
             if (enemylist[i][1] + enemyhi >= manyabs - collisionbuff and enemylist[i][
                 1] + enemyhi <= manyabs + collisionbuff) and (
                     (enemylist[i][0] >= manxabs and enemylist[i][0] <= manxabs+manwid) or (
                     enemylist[i][0] + enemywid >= manxabs and enemylist[i][0] + enemywid <= manxabs+manwid) or (
-                            enemylist[i][0] + enemywid <= manxabs+manwid and enemylist[i][0] >= manxabs) or (manxabs >= enemylist[i][0] and manxabs + manwid <= enemylist[i][0]+enemywid)):
+                            enemylist[i][0] + enemywid <= manxabs+manwid and enemylist[i][0] >= manxabs) or (
+                    manxabs >= enemylist[i][0] and manxabs + manwid <= enemylist[i][0]+enemywid)):
                 deathcoll = 1
                 collindex = i
 
@@ -1342,13 +1638,16 @@ def quickgameloop(blocklist,enemylistinput,manpos,flagpos,coinlistinput):
             if generalcirclecollision(coin,coinsize[0]/2,[manxabs,manyabs],manwid/2)==1:
                 coinindex = i
             i = i+1
-        if coinindex >=0:
+        if coinindex >= 0:
             del coinlist[coinindex]
-            score = score +1
+            score = score + 1
 
 
         #flag collision check
-        if (((manxabs+manwid >= flagpos[0]+flagoffset[0] and manxabs+manwid <= flagpos[0]+flagsize[0]-flagoffset[0]) or (manxabs >= flagpos[0]+flagoffset[0] and manxabs <= flagpos[0]+flagsize[0]-flagoffset[0])) and ((manyabs <= flagpos[1] + flagsize[1] - flagoffset[1] and manyabs >= flagpos[1]+flagoffset[1]) or (manyabs + manhi <= flagpos[1] + flagsize[1] - flagoffset[1] and manyabs + manhi >= flagpos[1]+flagoffset[1]))):
+        if (((manxabs+manwid >= flagpos[0]+flagoffset[0] and manxabs+manwid <= flagpos[0]+flagsize[0]-flagoffset[0]) or
+             (manxabs >= flagpos[0]+flagoffset[0] and manxabs <= flagpos[0]+flagsize[0]-flagoffset[0])) and
+                ((manyabs <= flagpos[1] + flagsize[1] - flagoffset[1] and manyabs >= flagpos[1]+flagoffset[1]) or
+                 (manyabs + manhi <= flagpos[1] + flagsize[1] - flagoffset[1] and manyabs + manhi >= flagpos[1]+flagoffset[1]))):
             win = 1
 
         #general collision checks
